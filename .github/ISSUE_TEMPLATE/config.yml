@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📋 Documentation
+    url: https://github.com/${{ github.repository }}/blob/main/README.md
+    about: Consulter la documentation du projet
+  - name: 💬 Discussion
+    url: https://github.com/${{ github.repository }}/discussions
+    about: Poser une question ou proposer une idée

@@ -1,0 +1,153 @@
+name: 🌿 Auto-Create Branch from Issue
+
+on:
+  issues:
+    types: [assigned]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to create branch for"
+        required: true
+        type: number
+      branch_type:
+        description: "Branch type"
+        required: true
+        type: choice
+        options:
+          - feature
+          - fix
+          - chore
+          - docs
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  create-branch:
+    name: 🌿 Create Branch for Issue
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine branch details
+        id: branch-details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let issueNumber, issueTitle, issueLabels;
+
+            if (context.eventName === 'workflow_dispatch') {
+              const issue = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt('${{ inputs.issue_number }}')
+              });
+              issueNumber = issue.data.number;
+              issueTitle = issue.data.title;
+              issueLabels = issue.data.labels.map(l => l.name);
+            } else {
+              issueNumber = context.payload.issue.number;
+              issueTitle = context.payload.issue.title;
+              issueLabels = context.payload.issue.labels.map(l => l.name);
+            }
+
+            // Determine branch type from labels
+            let branchType = '${{ inputs.branch_type }}' || 'feature';
+            if (context.eventName !== 'workflow_dispatch') {
+              if (issueLabels.includes('bug')) branchType = 'fix';
+              else if (issueLabels.includes('documentation')) branchType = 'docs';
+              else if (issueLabels.includes('chore')) branchType = 'chore';
+              else branchType = 'feature';
+            }
+
+            // Sanitize title for branch name
+            const sanitized = issueTitle
+              .toLowerCase()
+              .replace(/[^a-z0-9\s-]/g, '')
+              .trim()
+              .replace(/\s+/g, '-')
+              .replace(/-+/g, '-')
+              .substring(0, 50)
+              .replace(/-$/, '');
+
+            const branchName = `${branchType}/${issueNumber}-${sanitized}`;
+
+            core.setOutput('branch_name', branchName);
+            core.setOutput('issue_number', issueNumber.toString());
+            core.setOutput('branch_type', branchType);
+
+            console.log(`Branch to create: ${branchName}`);
+            return branchName;
+
+      - name: Check if branch already exists
+        id: check-branch
+        run: |
+          BRANCH="${{ steps.branch-details.outputs.branch_name }}"
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Branch $BRANCH already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Branch $BRANCH does not exist yet"
+          fi
+
+      - name: Determine base branch
+        id: base-branch
+        run: |
+          BRANCH_TYPE="${{ steps.branch-details.outputs.branch_type }}"
+          if [ "$BRANCH_TYPE" = "hotfix" ]; then
+            echo "base=main" >> $GITHUB_OUTPUT
+          else
+            echo "base=develop" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create branch
+        if: steps.check-branch.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BASE="${{ steps.base-branch.outputs.base }}"
+          BRANCH="${{ steps.branch-details.outputs.branch_name }}"
+
+          git fetch origin $BASE
+          git checkout -b $BRANCH origin/$BASE
+          git push origin $BRANCH
+
+          echo "✅ Created branch: $BRANCH from $BASE"
+
+      - name: Comment on issue with branch info
+        if: steps.check-branch.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = '${{ steps.branch-details.outputs.branch_name }}';
+            const issueNumber = parseInt('${{ steps.branch-details.outputs.issue_number }}');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## 🌿 Branche créée automatiquement\n\n**Branche:** \`${branchName}\`\n\n**Commandes pour démarrer:**\n\`\`\`bash\ngit fetch origin\ngit checkout ${branchName}\n\`\`\`\n\n> La branche a été créée depuis \`${{ steps.base-branch.outputs.base }}\``
+            });
+
+      - name: Add "in-progress" label to issue
+        if: steps.check-branch.outputs.exists == 'false' && github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = parseInt('${{ steps.branch-details.outputs.issue_number }}');
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: ['in-progress']
+              });
+            } catch (e) {
+              console.log('Could not add in-progress label:', e.message);
+            }

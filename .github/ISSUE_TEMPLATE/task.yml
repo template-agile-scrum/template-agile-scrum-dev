@@ -1,0 +1,74 @@
+name: "✅ Task technique"
+description: Tâche technique, refactoring, dette technique ou configuration
+title: "[TASK] "
+labels: ["task", "backlog"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ✅ Task Technique
+        Pour les tâches techniques qui ne sont pas directement des fonctionnalités utilisateur.
+
+  - type: input
+    id: parent-story
+    attributes:
+      label: User Story ou Epic parente
+      placeholder: "ex: #42"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description de la tâche
+      description: Décrivez clairement ce qui doit être fait et pourquoi
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type de tâche
+      options:
+        - "⚙️ Configuration / Setup"
+        - "🔧 Refactoring"
+        - "📦 Dépendances / Mise à jour"
+        - "🔒 Sécurité"
+        - "⚡ Performance"
+        - "🧪 Tests"
+        - "📚 Documentation"
+        - "🚀 Déploiement / Infrastructure"
+        - "🔗 Intégration tiers"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Critères d'acceptation
+      placeholder: |
+        - [ ] Critère 1
+        - [ ] Critère 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité
+      options:
+        - "🔴 Critique"
+        - "🟠 Haute"
+        - "🟡 Moyenne"
+        - "🟢 Faible"
+    validations:
+      required: true
+
+  - type: input
+    id: story-points
+    attributes:
+      label: Estimation (heures ou story points)
+      placeholder: "ex: 2h, 4h, 1j..."
+    validations:
+      required: false

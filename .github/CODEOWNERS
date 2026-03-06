@@ -1,0 +1,33 @@
+# CODEOWNERS
+# Définit qui est responsable des différentes parties du code
+# Documentation: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ─── Global — défaut pour tout le repo ────────────────────────────────────────
+# * @<username-ou-equipe>
+
+# ─── GitHub Configuration ─────────────────────────────────────────────────────
+.github/                    @<tech-lead>
+.github/workflows/          @<devops-team>
+.github/ISSUE_TEMPLATE/     @<product-manager>
+
+# ─── Documentation ────────────────────────────────────────────────────────────
+docs/                       @<tech-lead> @<product-manager>
+*.md                        @<tech-lead>
+CHANGELOG.md                @<tech-lead>
+
+# ─── Configuration ─────────────────────────────────────────────────────────────
+.releaserc.json             @<tech-lead>
+package.json                @<tech-lead>
+scripts/                    @<devops-team>
+
+# ─── Source Code (à adapter selon votre structure) ────────────────────────────
+# src/api/                  @<backend-team>
+# src/frontend/             @<frontend-team>
+# src/services/             @<backend-team>
+# src/auth/                 @<security-reviewer>
+# src/database/             @<backend-team>
+
+# ─── Infrastructure ────────────────────────────────────────────────────────────
+# docker/                   @<devops-team>
+# terraform/                @<devops-team>
+# k8s/                      @<devops-team>
