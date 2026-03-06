@@ -1,0 +1,85 @@
+name: "🚀 Epic"
+description: Définir une Epic regroupant plusieurs User Stories
+title: "[EPIC] "
+labels: ["epic"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🚀 Epic
+        Une Epic est un grand bloc de travail qui peut être découpé en plusieurs User Stories.
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objectif métier
+      description: Quel est l'objectif principal de cette Epic ?
+      placeholder: "Décrivez la valeur métier apportée par cette Epic..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Périmètre
+      description: Ce qui est inclus et exclus de cette Epic
+      placeholder: |
+        **Inclus :**
+        - 
+
+        **Exclus :**
+        - 
+    validations:
+      required: false
+
+  - type: textarea
+    id: user-stories
+    attributes:
+      label: User Stories associées
+      description: Liste des User Stories qui composent cette Epic
+      placeholder: |
+        - [ ] #XX - Story 1
+        - [ ] #XX - Story 2
+        - [ ] #XX - Story 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Critères d'acceptation globaux
+      description: Conditions pour que l'Epic soit considérée comme terminée
+      placeholder: |
+        - [ ] Critère 1
+        - [ ] Critère 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité
+      options:
+        - "🔴 Critique"
+        - "🟠 Haute"
+        - "🟡 Moyenne"
+        - "🟢 Faible"
+    validations:
+      required: true
+
+  - type: input
+    id: target-version
+    attributes:
+      label: Version cible
+      placeholder: "ex: v1.0.0, v2.0.0"
+    validations:
+      required: false
+
+  - type: input
+    id: target-sprint
+    attributes:
+      label: Sprint(s) cible(s)
+      placeholder: "ex: Sprint 1-3"
+    validations:
+      required: false

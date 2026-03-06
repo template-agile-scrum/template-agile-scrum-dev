@@ -1,0 +1,43 @@
+{
+  "recommendations": [
+    // Git & GitHub
+    "eamodio.gitlens",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "github.copilot",
+    "github.copilot-chat",
+
+    // Code Quality
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "streetsidesoftware.code-spell-checker",
+    "streetsidesoftware.code-spell-checker-french",
+    "SonarSource.sonarlint-vscode",
+
+    // Markdown & Docs
+    "yzhang.markdown-all-in-one",
+    "DavidAnson.vscode-markdownlint",
+    "bierner.markdown-mermaid",
+
+    // YAML & JSON
+    "redhat.vscode-yaml",
+    "ZainChen.one-json",
+
+    // Productivity
+    "EditorConfig.EditorConfig",
+    "aaron-bond.better-comments",
+    "usernamehw.errorlens",
+    "christian-kohler.path-intellisense",
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+
+    // Testing
+    "Orta.vscode-jest",
+    "ms-vscode.test-adapter-converter",
+
+    // Agile / Project
+    "pflannery.vscode-versionlens",
+    "fabiospampinato.vscode-todo-plus"
+  ],
+  "unwantedRecommendations": []
+}

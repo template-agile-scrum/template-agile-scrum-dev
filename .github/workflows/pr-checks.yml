@@ -1,0 +1,179 @@
+name: 🔍 PR Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  issues: read
+
+jobs:
+  # ─── Validate PR Title (Conventional Commits) ─────────────────────────────────
+  pr-title:
+    name: 📝 Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title follows Conventional Commits
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+            ci
+            build
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            Le titre de la PR doit commencer par une minuscule.
+            Format attendu: <type>(<scope optionnel>): <description>
+            Exemples:
+              feat: ajouter authentification OAuth
+              fix(api): corriger la pagination des résultats
+              docs: mettre à jour le guide d'installation
+
+  # ─── Check Linked Issue ────────────────────────────────────────────────────────
+  linked-issue:
+    name: 🔗 Check Linked Issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR has a linked issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            const prTitle = context.payload.pull_request.title || '';
+
+            // Patterns to detect linked issues
+            const linkedIssuePatterns = [
+              /closes?\s+#\d+/i,
+              /fixes?\s+#\d+/i,
+              /resolves?\s+#\d+/i,
+              /refs?\s+#\d+/i,
+              /related\s+to\s+#\d+/i,
+            ];
+
+            const hasLinkedIssue = linkedIssuePatterns.some(pattern =>
+              pattern.test(prBody) || pattern.test(prTitle)
+            );
+
+            // Skip check for dependabot and renovate PRs
+            const author = context.payload.pull_request.user.login;
+            if (author === 'dependabot[bot]' || author === 'renovate[bot]') {
+              console.log('Skipping linked issue check for bot PR');
+              return;
+            }
+
+            if (!hasLinkedIssue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: `## ⚠️ Issue liée manquante\n\nCette PR ne semble pas liée à une issue GitHub.\n\nAjoutez dans la description de votre PR:\n\`\`\`\nCloses #<numéro-issue>\n\`\`\`\n\nSi cette PR ne correspond pas à une issue existante, créez d'abord une issue (User Story, Bug, Task ou Epic).`
+              });
+              core.setFailed('La PR doit être liée à une issue GitHub');
+            } else {
+              console.log('✅ PR est liée à une issue');
+            }
+
+  # ─── Label PR Automatically ───────────────────────────────────────────────────
+  auto-label:
+    name: 🏷️ Auto Label
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply labels based on PR title
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.pull_request.title;
+            const labelMap = {
+              'feat': 'feature',
+              'fix': 'bug',
+              'docs': 'documentation',
+              'chore': 'chore',
+              'refactor': 'refactor',
+              'test': 'tests',
+              'perf': 'performance',
+              'ci': 'ci/cd',
+              'build': 'build',
+              'security': 'security',
+            };
+
+            const typeMatch = title.match(/^(\w+)(\(.+\))?:/);
+            if (typeMatch) {
+              const type = typeMatch[1].toLowerCase();
+              const label = labelMap[type];
+              if (label) {
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.payload.pull_request.number,
+                    labels: [label]
+                  });
+                  console.log(`✅ Applied label: ${label}`);
+                } catch (e) {
+                  console.log(`Label "${label}" does not exist, skipping`);
+                }
+              }
+            }
+
+            // Label PRs targeting main as "release"
+            const baseBranch = context.payload.pull_request.base.ref;
+            if (baseBranch === 'main') {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  labels: ['release']
+                });
+              } catch (e) {
+                console.log('Label "release" does not exist, skipping');
+              }
+            }
+
+  # ─── Branch Name Validation ───────────────────────────────────────────────────
+  branch-name:
+    name: 🌿 Validate Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const validPatterns = [
+              /^main$/,
+              /^develop$/,
+              /^feature\/\d+-[\w-]+$/,
+              /^fix\/\d+-[\w-]+$/,
+              /^hotfix\/\d+-[\w-]+$/,
+              /^release\/v?\d+\.\d+(\.\d+)?(-[\w.]+)?$/,
+              /^chore\/[\w-]+$/,
+              /^docs\/[\w-]+$/,
+              /^test\/[\w-]+$/,
+              /^refactor\/[\w-]+$/,
+              /^dependabot\/.+$/,
+              /^renovate\/.+$/,
+              /^copilot\/.+$/,
+            ];
+
+            const isValid = validPatterns.some(pattern => pattern.test(branch));
+
+            if (!isValid) {
+              core.warning(`⚠️ La branche "${branch}" ne respecte pas la convention de nommage.\n\nFormats acceptés:\n- feature/<issue-id>-<description>\n- fix/<issue-id>-<description>\n- hotfix/<issue-id>-<description>\n- release/v<major>.<minor>.<patch>\n- chore/<description>\n- docs/<description>`);
+            } else {
+              console.log(`✅ Branch name "${branch}" is valid`);
+            }

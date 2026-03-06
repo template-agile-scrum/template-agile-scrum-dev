@@ -1,0 +1,92 @@
+name: "📖 User Story"
+description: Ajouter une nouvelle fonctionnalité du point de vue utilisateur (Agile/Scrum)
+title: "[USER STORY] "
+labels: ["user-story", "backlog"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📖 User Story
+        Décrivez la fonctionnalité du point de vue de l'utilisateur final.
+
+  - type: input
+    id: epic
+    attributes:
+      label: Epic parente
+      description: Numéro ou titre de l'Epic à laquelle cette User Story appartient
+      placeholder: "ex: #42 - Authentification"
+    validations:
+      required: false
+
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: Formulation classique de la User Story
+      placeholder: |
+        En tant que [type d'utilisateur],
+        Je veux [fonctionnalité],
+        Afin de [bénéfice / valeur métier].
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Critères d'acceptation (DoD)
+      description: Liste des conditions à remplir pour que la story soit considérée comme terminée
+      placeholder: |
+        - [ ] Critère 1
+        - [ ] Critère 2
+        - [ ] Critère 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: Notes techniques
+      description: Informations techniques, contraintes, ou dépendances
+      placeholder: "API à utiliser, services tiers, contraintes de performance..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité
+      options:
+        - "🔴 Critique"
+        - "🟠 Haute"
+        - "🟡 Moyenne"
+        - "🟢 Faible"
+    validations:
+      required: true
+
+  - type: input
+    id: story-points
+    attributes:
+      label: Story Points (estimation)
+      placeholder: "ex: 3, 5, 8, 13..."
+    validations:
+      required: false
+
+  - type: input
+    id: sprint
+    attributes:
+      label: Sprint cible
+      placeholder: "ex: Sprint 3"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: definition-of-ready
+    attributes:
+      label: Definition of Ready (DoR)
+      description: Vérifiez que cette story est prête à être développée
+      options:
+        - label: La story est claire et compréhensible
+        - label: Les critères d'acceptation sont définis
+        - label: Les dépendances sont identifiées
+        - label: L'estimation est réalisée

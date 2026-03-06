@@ -1,0 +1,148 @@
+name: 🚀 Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  # ─── Validate Before Release ─────────────────────────────────────────────────
+  validate:
+    name: 🔍 Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # ─── Semantic Release ─────────────────────────────────────────────────────────
+  release:
+    name: 📦 Semantic Release
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Semantic Release
+        id: release
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          semantic_version: 23
+          extra_plugins: |
+            @semantic-release/changelog@6
+            @semantic-release/git@10
+            conventional-changelog-conventionalcommits@7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ─── Post-Release: Update Milestones ─────────────────────────────────────────
+  update-milestones:
+    name: 📌 Update Milestones
+    runs-on: ubuntu-latest
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    steps:
+      - name: Close milestone for released version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.release.outputs.version }}';
+            const milestones = await github.rest.issues.listMilestones({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            const milestone = milestones.data.find(m => m.title === `v${version}`);
+            if (milestone) {
+              await github.rest.issues.updateMilestone({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                milestone_number: milestone.number,
+                state: 'closed'
+              });
+              console.log(`✅ Closed milestone v${version}`);
+            } else {
+              console.log(`ℹ️ No milestone found for v${version}`);
+            }
+
+  # ─── Deploy to Production (customize for your stack) ─────────────────────────
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    environment:
+      name: production
+      url: https://your-app.com # TODO: replace with your production URL
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ github.sha }}
+          path: dist/
+        continue-on-error: true
+
+      # TODO: Add your deployment steps here
+      # Examples:
+      # - Deploy to Vercel: uses: amondnet/vercel-action@v25
+      # - Deploy to AWS: uses: aws-actions/configure-aws-credentials@v4
+      # - Deploy to Heroku: uses: akhileshns/heroku-deploy@v3.13.15
+      - name: Deploy placeholder
+        run: |
+          echo "🚀 Deploying version ${{ needs.release.outputs.version }} to production"
+          echo "TODO: Add your deployment steps in .github/workflows/release.yml"

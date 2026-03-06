@@ -1,0 +1,68 @@
+name: 🧹 Stale Issues & PRs
+
+on:
+  schedule:
+    # Runs every day at 6:00 AM UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: 🧹 Mark and Close Stale Items
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # ─── Issues ─────────────────────────────────────────────────────────
+          stale-issue-message: |
+            👋 Cette issue semble inactive depuis 30 jours.
+
+            Elle sera automatiquement fermée dans **7 jours** si aucune activité n'est détectée.
+
+            Pour garder cette issue ouverte :
+            - Ajoutez un commentaire
+            - Assignez-la à quelqu'un
+            - Ajoutez le label `keep-open`
+
+          close-issue-message: |
+            🔒 Cette issue a été fermée automatiquement après 37 jours d'inactivité.
+
+            Elle peut être réouverte si nécessaire.
+
+          days-before-issue-stale: 30
+          days-before-issue-close: 7
+
+          # ─── Pull Requests ───────────────────────────────────────────────────
+          stale-pr-message: |
+            👋 Cette PR semble inactive depuis 14 jours.
+
+            Elle sera automatiquement fermée dans **7 jours** si aucune activité n'est détectée.
+
+            Pour garder cette PR ouverte :
+            - Ajoutez un commentaire
+            - Demandez une review
+            - Ajoutez le label `keep-open`
+
+          close-pr-message: |
+            🔒 Cette PR a été fermée automatiquement après 21 jours d'inactivité.
+
+            Elle peut être réouverte si nécessaire.
+
+          days-before-pr-stale: 14
+          days-before-pr-close: 7
+
+          # ─── Labels ──────────────────────────────────────────────────────────
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
+          exempt-issue-labels: "keep-open,epic,in-progress,blocked"
+          exempt-pr-labels: "keep-open,in-review,blocked"
+          exempt-all-milestones: true
+
+          # ─── Options ─────────────────────────────────────────────────────────
+          operations-per-run: 100
+          remove-stale-when-updated: true
+          close-issue-reason: not_planned

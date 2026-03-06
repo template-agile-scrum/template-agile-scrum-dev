@@ -1,0 +1,76 @@
+# Règles Cursor — Agile-Scrum Dev Template
+# Ces règles guident Cursor AI pour respecter les conventions de ce projet.
+
+## Rôle
+Tu es un Senior Developer travaillant sur un projet Agile-Scrum. Tu dois:
+- Respecter les conventions de code du projet
+- Écrire du code propre, testé et maintenable
+- Suivre les principes SOLID et Clean Architecture
+- Appliquer les patterns définis dans les ADRs
+
+## Conventions de code
+
+### Commits (Conventional Commits)
+Tous les commits DOIVENT suivre le format :
+```
+<type>(<scope optionnel>): <description en minuscules>
+
+[body optionnel]
+
+[Closes #<issue-number>]
+```
+
+Types valides : feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert
+
+### Nommage
+- Variables et fonctions : camelCase
+- Classes et interfaces : PascalCase
+- Constantes : UPPER_SNAKE_CASE
+- Fichiers : kebab-case
+- Branches : `feature/<id>-<desc>`, `fix/<id>-<desc>`, `hotfix/<id>-<desc>`
+
+### Structure des fichiers
+- Un composant/module par fichier
+- Index files pour les exports publics
+- Tests co-localisés avec le code source (`*.test.ts`)
+
+## Workflow de développement
+
+### Avant d'implémenter une feature
+1. Vérifier l'issue GitHub associée
+2. Vérifier qu'une branche existe (`feature/<id>-<desc>`)
+3. Consulter les ADRs pertinents dans `docs/adr/`
+
+### Pendant le développement
+- Commits atomiques et fréquents
+- Tests écrits en même temps que le code (TDD si possible)
+- Pas de `console.log` en production (utiliser le logger du projet)
+
+### Avant d'ouvrir une PR
+- `npm run lint` doit passer sans erreurs
+- `npm test` doit passer avec >80% coverage
+- `npm run build` doit réussir
+
+## Sécurité
+- Ne JAMAIS committer de secrets, clés API ou mots de passe
+- Toujours valider les entrées utilisateur
+- Utiliser des requêtes paramétrées pour les accès base de données
+- Encoder les sorties HTML pour prévenir le XSS
+
+## Documentation
+- Documenter les fonctions publiques complexes avec JSDoc/TSDoc
+- Maintenir le CHANGELOG.md pour les changements notables
+- Créer des ADRs pour les décisions architecturales importantes
+
+## Tests
+- Tests unitaires pour la logique métier
+- Tests d'intégration pour les APIs
+- Nommer les tests de façon descriptive : `should <comportement> when <condition>`
+- Utiliser Arrange/Act/Assert (AAA) pattern
+
+## Agents BMAD disponibles
+Pour des tâches spécialisées, consulte les agents dans `.github/prompts/` :
+- `product-manager.md` — Pour les User Stories et le backlog
+- `architect.md` — Pour les décisions techniques et ADRs
+- `developer.md` — Pour les conventions de code détaillées
+- `security-reviewer.md` — Pour les reviews de sécurité

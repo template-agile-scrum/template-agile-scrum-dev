@@ -1,0 +1,103 @@
+{
+  // ─── Editor ───────────────────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.rulers": [80, 120],
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "editor.trimAutoWhitespace": true,
+
+  // ─── Files ────────────────────────────────────────────────────────────────
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.eol": "\n",
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true,
+    "**/coverage": true,
+    "**/.next": true
+  },
+
+  // ─── Search ───────────────────────────────────────────────────────────────
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true,
+    "**/.next": true,
+    "**/package-lock.json": true,
+    "**/yarn.lock": true
+  },
+
+  // ─── Git ──────────────────────────────────────────────────────────────────
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.branchProtection": ["main", "develop"],
+  "git.inputValidationSubjectLength": 72,
+  "git.inputValidationLength": 72,
+  "gitlens.graph.layout": "editor",
+  "gitlens.hovers.currentLine.over": "line",
+
+  // ─── GitHub Copilot ───────────────────────────────────────────────────────
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": true,
+    "yaml": true
+  },
+  "github.copilot.chat.agent.thinkingTool": true,
+
+  // ─── YAML ────────────────────────────────────────────────────────────────
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml",
+    "https://json.schemastore.org/github-action.json": ".github/actions/*/action.yml"
+  },
+  "yaml.format.enable": true,
+
+  // ─── Markdown ─────────────────────────────────────────────────────────────
+  "markdownlint.config": {
+    "MD013": false,
+    "MD033": false
+  },
+
+  // ─── Spell Checker ────────────────────────────────────────────────────────
+  "cSpell.language": "en,fr",
+  "cSpell.words": [
+    "Agile",
+    "Scrum",
+    "Kanban",
+    "backlog",
+    "sprint",
+    "BMAD",
+    "Asana",
+    "conventionalcommits",
+    "hotfix",
+    "semver",
+    "releaserc",
+    "octokit"
+  ],
+
+  // ─── Error Lens ───────────────────────────────────────────────────────────
+  "errorLens.enabledDiagnosticLevels": ["error", "warning", "info"],
+  "errorLens.followCursor": "allLines",
+
+  // ─── TypeScript ───────────────────────────────────────────────────────────
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.suggest.autoImports": true,
+  "javascript.updateImportsOnFileMove.enabled": "always",
+
+  // ─── Testing ──────────────────────────────────────────────────────────────
+  "jest.autoRun": "off",
+  "jest.showCoverageOnLoad": false,
+
+  // ─── Terminal ─────────────────────────────────────────────────────────────
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.defaultProfile.osx": "zsh"
+}

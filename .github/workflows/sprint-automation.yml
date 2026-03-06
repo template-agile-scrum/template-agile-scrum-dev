@@ -1,0 +1,195 @@
+name: 🏃 Sprint Automation
+
+on:
+  issues:
+    types: [opened, labeled, closed, reopened]
+  pull_request:
+    types: [closed]
+  schedule:
+    # Every Monday at 9:00 AM UTC — sprint health check
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - create-sprint-milestone
+          - close-sprint
+          - sprint-report
+      sprint_name:
+        description: "Sprint name (ex: Sprint 3)"
+        required: false
+        type: string
+      sprint_due_date:
+        description: "Sprint due date (YYYY-MM-DD)"
+        required: false
+        type: string
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  # ─── Create Sprint Milestone ──────────────────────────────────────────────────
+  create-sprint-milestone:
+    name: 📅 Create Sprint Milestone
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'create-sprint-milestone'
+    steps:
+      - name: Create milestone
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sprintName = '${{ inputs.sprint_name }}';
+            const dueDate = '${{ inputs.sprint_due_date }}';
+
+            if (!sprintName) {
+              core.setFailed('sprint_name is required');
+              return;
+            }
+
+            const milestone = await github.rest.issues.createMilestone({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: sprintName,
+              due_on: dueDate ? new Date(dueDate + 'T23:59:59Z').toISOString() : undefined,
+              description: `Sprint milestone for ${sprintName}`
+            });
+
+            console.log(`✅ Created milestone: ${milestone.data.title} (#${milestone.data.number})`);
+
+  # ─── Auto-Triage New Issues ───────────────────────────────────────────────────
+  auto-triage:
+    name: 🏷️ Auto-Triage Issue
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    steps:
+      - name: Add backlog label to new issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const existingLabels = issue.labels.map(l => l.name);
+
+            // Only add backlog if no status label exists
+            const statusLabels = ['backlog', 'in-progress', 'in-review', 'done', 'blocked'];
+            const hasStatusLabel = existingLabels.some(l => statusLabels.includes(l));
+
+            if (!hasStatusLabel) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['backlog']
+                });
+                console.log(`✅ Added 'backlog' label to issue #${issue.number}`);
+              } catch (e) {
+                console.log('Could not add label:', e.message);
+              }
+            }
+
+  # ─── Update Issue Status on PR Merge ─────────────────────────────────────────
+  close-issues-on-pr-merge:
+    name: ✅ Close Issues on PR Merge
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    steps:
+      - name: Extract and close linked issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            const prNumber = context.payload.pull_request.number;
+
+            // Extract issue numbers from PR body
+            const patterns = [
+              /(?:closes?|fixes?|resolves?)\s+#(\d+)/gi,
+            ];
+
+            const issueNumbers = new Set();
+            for (const pattern of patterns) {
+              let match;
+              while ((match = pattern.exec(prBody)) !== null) {
+                issueNumbers.add(parseInt(match[1]));
+              }
+            }
+
+            console.log(`Found ${issueNumbers.size} linked issues: ${[...issueNumbers].join(', ')}`);
+
+            // Add "done" label to linked issues
+            for (const issueNumber of issueNumbers) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  labels: ['done']
+                });
+
+                // Remove in-progress label if present
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    name: 'in-progress'
+                  });
+                } catch (e) {}
+
+                console.log(`✅ Marked issue #${issueNumber} as done`);
+              } catch (e) {
+                console.log(`Could not update issue #${issueNumber}:`, e.message);
+              }
+            }
+
+  # ─── Weekly Sprint Health Check ───────────────────────────────────────────────
+  sprint-health-check:
+    name: 📊 Sprint Health Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Generate sprint report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get open milestones (sprints)
+            const milestones = await github.rest.issues.listMilestones({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'due_on'
+            });
+
+            if (milestones.data.length === 0) {
+              console.log('No open milestones found');
+              return;
+            }
+
+            const currentSprint = milestones.data[0];
+            const openIssues = currentSprint.open_issues;
+            const closedIssues = currentSprint.closed_issues;
+            const totalIssues = openIssues + closedIssues;
+            const progress = totalIssues > 0 ? Math.round((closedIssues / totalIssues) * 100) : 0;
+
+            const dueDate = currentSprint.due_on ? new Date(currentSprint.due_on).toLocaleDateString('fr-FR') : 'Non définie';
+            const daysLeft = currentSprint.due_on
+              ? Math.ceil((new Date(currentSprint.due_on) - new Date()) / (1000 * 60 * 60 * 24))
+              : null;
+
+            const report = [
+              `## 📊 Sprint Health Check — ${currentSprint.title}`,
+              ``,
+              `| Métrique | Valeur |`,
+              `|----------|--------|`,
+              `| Progression | ${progress}% (${closedIssues}/${totalIssues} issues) |`,
+              `| Issues ouvertes | ${openIssues} |`,
+              `| Issues fermées | ${closedIssues} |`,
+              `| Date de fin | ${dueDate} |`,
+              daysLeft !== null ? `| Jours restants | ${daysLeft} ${daysLeft < 0 ? '⚠️ SPRINT TERMINÉ' : daysLeft <= 3 ? '⚠️ Sprint se termine bientôt' : ''} |` : '',
+            ].filter(Boolean).join('\n');
+
+            console.log(report);
