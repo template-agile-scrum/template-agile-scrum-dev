@@ -1,0 +1,245 @@
+name: ⚡ Performance Monitoring
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  schedule:
+    # Run performance tests weekly on Monday at 3:00 AM UTC
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ─── Bundle Size Analysis ──────────────────────────────────────────────────────
+  bundle-size:
+    name: 📦 Bundle Size Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Analyze bundle size
+        uses: andresz1/size-limit-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Skip if size-limit is not configured
+          skip_step: npm run size || echo "size-limit not configured"
+
+      - name: Generate bundle stats
+        run: |
+          # Generate webpack bundle stats if applicable
+          if [ -f "webpack.config.js" ]; then
+            npm run build -- --json > webpack-stats.json || true
+          fi
+
+          # List build artifact sizes
+          if [ -d "dist" ]; then
+            echo "## Build Artifacts Size" > bundle-report.md
+            echo "\`\`\`" >> bundle-report.md
+            du -h dist/* | sort -h >> bundle-report.md
+            echo "\`\`\`" >> bundle-report.md
+          fi
+
+      - name: Upload bundle stats
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-stats
+          path: |
+            webpack-stats.json
+            bundle-report.md
+          retention-days: 30
+
+      - name: Comment bundle size on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('bundle-report.md')) {
+              const report = fs.readFileSync('bundle-report.md', 'utf8');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: `## 📦 Bundle Size Report\n\n${report}`
+              });
+            }
+
+  # ─── Lighthouse Performance Tests ──────────────────────────────────────────────
+  lighthouse:
+    name: 🔦 Lighthouse CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v11
+        with:
+          configPath: "./.github/lighthouserc.json"
+          temporaryPublicStorage: true
+          uploadArtifacts: true
+          runs: 3
+
+      - name: Comment Lighthouse results on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Lighthouse CI automatically comments on PRs
+            console.log('✅ Lighthouse results will be commented automatically');
+
+  # ─── Load Testing (for APIs) ────────────────────────────────────────────────────
+  load-test:
+    name: 🔥 Load Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install k6 (load testing tool)
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run load tests
+        run: |
+          # Example k6 load test script
+          # TODO: Create k6 test scripts in tests/load/
+          echo "import http from 'k6/http';" > test.js
+          echo "import { check } from 'k6';" >> test.js
+          echo "export let options = { vus: 10, duration: '30s' };" >> test.js
+          echo "export default function() {" >> test.js
+          echo "  let res = http.get('https://staging.example.com');" >> test.js
+          echo "  check(res, { 'status is 200': (r) => r.status === 200 });" >> test.js
+          echo "}" >> test.js
+
+          # Run k6 test (will fail if URL doesn't exist)
+          # k6 run test.js || echo "Load test skipped - configure endpoint first"
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results
+          path: |
+            *.json
+            *.html
+          retention-days: 30
+
+  # ─── Code Coverage Tracking ─────────────────────────────────────────────────────
+  coverage:
+    name: 📊 Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Generate coverage badge
+        uses: cicirello/jacoco-badge-generator@v2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          badges-directory: .github/badges
+          generate-branches-badge: true
+          generate-summary: true
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          delete-old-comments: true
+
+  # ─── Performance Regression Detection ──────────────────────────────────────────
+  performance-regression:
+    name: 📈 Performance Regression Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run benchmark tests
+        run: |
+          # TODO: Add benchmark tests
+          # npm run benchmark || echo "No benchmark tests configured"
+          echo "⏱️ Benchmark tests would run here"
+
+      - name: Compare with base branch
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: "customSmallerIsBetter"
+          output-file-path: benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          alert-threshold: "150%"
+          comment-on-alert: true
+          fail-on-alert: true
