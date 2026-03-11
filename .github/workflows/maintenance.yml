@@ -1,0 +1,283 @@
+name: 🔄 Repository Maintenance
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Maintenance task to run"
+        required: true
+        type: choice
+        options:
+          - cleanup-artifacts
+          - cleanup-caches
+          - backup-issues
+          - sync-labels
+          - update-milestones
+          - all
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+  pull-requests: write
+
+jobs:
+  # ─── Cleanup Old Artifacts ──────────────────────────────────────────────────────
+  cleanup-artifacts:
+    name: 🧹 Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.task == 'cleanup-artifacts' ||
+      github.event.inputs.task == 'all'
+    steps:
+      - name: Delete old artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const days = 7; // Keep artifacts for 7 days
+            const timestamp = Date.now() - (days * 24 * 60 * 60 * 1000);
+
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            let deleted = 0;
+            for (const artifact of artifacts.data.artifacts) {
+              const createdAt = new Date(artifact.created_at).getTime();
+              if (createdAt < timestamp) {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id
+                });
+                deleted++;
+                console.log(`🗑️ Deleted artifact: ${artifact.name}`);
+              }
+            }
+
+            console.log(`✅ Deleted ${deleted} old artifacts`);
+
+  # ─── Cleanup Old Caches ─────────────────────────────────────────────────────────
+  cleanup-caches:
+    name: 🧹 Cleanup Old Caches
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.task == 'cleanup-caches' ||
+      github.event.inputs.task == 'all'
+    steps:
+      - name: Delete stale caches
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const days = 7;
+            const timestamp = Date.now() - (days * 24 * 60 * 60 * 1000);
+
+            const caches = await github.rest.actions.getActionsCacheList({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            let deleted = 0;
+            for (const cache of caches.data.actions_caches) {
+              const createdAt = new Date(cache.created_at).getTime();
+              if (createdAt < timestamp) {
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id
+                });
+                deleted++;
+                console.log(`🗑️ Deleted cache: ${cache.key}`);
+              }
+            }
+
+            console.log(`✅ Deleted ${deleted} old caches`);
+
+  # ─── Backup Issues & PRs ────────────────────────────────────────────────────────
+  backup-issues:
+    name: 💾 Backup Issues & PRs
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event.inputs.task == 'backup-issues' ||
+      github.event.inputs.task == 'all'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export issues to JSON
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Fetch all issues
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100
+            });
+
+            // Fetch all pull requests
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100
+            });
+
+            const backup = {
+              timestamp: new Date().toISOString(),
+              repository: context.repo.repo,
+              issues: issues.filter(i => !i.pull_request),
+              pull_requests: prs
+            };
+
+            fs.writeFileSync('backup.json', JSON.stringify(backup, null, 2));
+            console.log(`✅ Backed up ${backup.issues.length} issues and ${backup.pull_requests.length} PRs`);
+
+      - name: Upload backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-backup-${{ github.run_number }}
+          path: backup.json
+          retention-days: 90
+
+  # ─── Sync Labels Across Repositories ───────────────────────────────────────────
+  sync-labels:
+    name: 🏷️ Sync Labels
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.task == 'sync-labels' ||
+      github.event.inputs.task == 'all'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync labels from labels.yml
+        uses: micnncim/action-label-syncer@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          manifest: .github/labels.yml
+          prune: false
+
+  # ─── Update Sprint Milestones ──────────────────────────────────────────────────
+  update-milestones:
+    name: 📅 Update Sprint Milestones
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.task == 'update-milestones' ||
+      github.event.inputs.task == 'all'
+    steps:
+      - name: Auto-close expired milestones
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const milestones = await github.rest.issues.listMilestones({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+
+            const now = new Date();
+            let closed = 0;
+
+            for (const milestone of milestones.data) {
+              if (milestone.due_on && new Date(milestone.due_on) < now) {
+                await github.rest.issues.updateMilestone({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  milestone_number: milestone.number,
+                  state: 'closed'
+                });
+                closed++;
+                console.log(`🔒 Closed expired milestone: ${milestone.title}`);
+              }
+            }
+
+            console.log(`✅ Closed ${closed} expired milestones`);
+
+  # ─── Generate Repository Statistics ────────────────────────────────────────────
+  repository-stats:
+    name: 📊 Generate Repository Stats
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate statistics
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Get contributor stats
+            const contributors = await github.rest.repos.listContributors({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            // Get recent activity
+            const commits = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            const stats = {
+              timestamp: new Date().toISOString(),
+              contributors: contributors.data.length,
+              recent_commits: commits.data.length,
+              top_contributors: contributors.data.slice(0, 10).map(c => ({
+                login: c.login,
+                contributions: c.contributions
+              }))
+            };
+
+            fs.writeFileSync('stats.json', JSON.stringify(stats, null, 2));
+            console.log('✅ Generated repository statistics');
+
+      - name: Upload statistics
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-stats-${{ github.run_number }}
+          path: stats.json
+          retention-days: 30
+
+  # ─── Dependency Update Summary ──────────────────────────────────────────────────
+  dependency-summary:
+    name: 📦 Dependency Update Summary
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate dependency report
+        run: |
+          echo "# Dependency Status Report" > dependency-report.md
+          echo "" >> dependency-report.md
+          echo "Generated: $(date)" >> dependency-report.md
+          echo "" >> dependency-report.md
+
+          # TODO: Add actual dependency checking
+          # npm outdated --json > outdated.json || true
+
+          echo "✅ Dependency report generated"
+
+      - name: Upload dependency report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-report-${{ github.run_number }}
+          path: dependency-report.md
+          retention-days: 30
