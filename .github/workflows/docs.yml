@@ -1,0 +1,158 @@
+name: 📚 Auto-Update Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "**.md"
+      - "docs/**"
+  pull_request:
+    paths:
+      - "**.md"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ─── Generate API Documentation ────────────────────────────────────────────────
+  api-docs:
+    name: 📖 Generate API Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate JSDoc/TypeDoc
+        run: |
+          # TODO: Configure typedoc or jsdoc
+          # npm run docs:generate || echo "No doc generator configured"
+          echo "📖 API documentation generation would run here"
+
+      - name: Commit generated docs
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -d "docs/api" ]; then
+            git add docs/api/
+            git diff --staged --quiet || git commit -m "docs: update API documentation [skip ci]"
+            git push
+          fi
+
+  # ─── Validate Documentation Links ──────────────────────────────────────────────
+  check-links:
+    name: 🔗 Check Documentation Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: "yes"
+          use-verbose-mode: "yes"
+          config-file: ".github/markdown-link-check-config.json"
+          folder-path: "docs/"
+
+      - name: Comment on PR if broken links found
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `⚠️ **Broken links detected in documentation**\n\nPlease check the workflow logs and fix broken links before merging.`
+            });
+
+  # ─── Spell Check Documentation ─────────────────────────────────────────────────
+  spell-check:
+    name: ✍️ Spell Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Spell check markdown files
+        uses: rojopolis/spellcheck-github-actions@0.36.0
+        with:
+          config_path: ".github/spellcheck-config.yml"
+          task_name: Markdown
+
+  # ─── Update README Badges ───────────────────────────────────────────────────────
+  update-badges:
+    name: 🏅 Update README Badges
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate dynamic badges
+        run: |
+          # Update workflow status badges
+          echo "🏅 Badges would be updated here"
+          # You can use shields.io or other badge services
+
+      - name: Commit badge updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git diff --quiet README.md; then
+            git add README.md
+            git commit -m "docs: update status badges [skip ci]"
+            git push
+          fi
+
+  # ─── Deploy Documentation Site (GitHub Pages) ──────────────────────────────────
+  deploy-docs:
+    name: 🌐 Deploy Docs to GitHub Pages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build documentation site
+        run: |
+          # TODO: Build your docs site (VitePress, Docusaurus, MkDocs, etc.)
+          # npm run docs:build || echo "No docs build script configured"
+          mkdir -p public
+          cp -r docs/* public/ || true
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public/
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
