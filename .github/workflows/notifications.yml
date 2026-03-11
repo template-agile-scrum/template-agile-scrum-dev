@@ -1,0 +1,202 @@
+name: 📢 Notifications
+
+on:
+  workflow_run:
+    workflows:
+      ["✅ CI Pipeline", "🚀 Release", "🚀 Deploy", "🔒 Security Scanning"]
+    types: [completed]
+  issues:
+    types: [opened, closed]
+  pull_request:
+    types: [opened, closed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  # ─── Slack Notifications ───────────────────────────────────────────────────────
+  slack:
+    name: 📤 Slack Notification
+    runs-on: ubuntu-latest
+    if: vars.SLACK_WEBHOOK_URL != ''
+    steps:
+      - name: Determine notification context
+        id: context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const eventName = context.eventName;
+            let message = '';
+            let color = '#0366d6';
+            let emoji = '📢';
+
+            if (eventName === 'workflow_run') {
+              const workflow = context.payload.workflow_run;
+              const status = workflow.conclusion;
+
+              emoji = status === 'success' ? '✅' : '❌';
+              color = status === 'success' ? '#28a745' : '#d73a49';
+              message = `Workflow **${workflow.name}** ${status} on \`${workflow.head_branch}\``;
+
+            } else if (eventName === 'issues') {
+              const action = context.payload.action;
+              const issue = context.payload.issue;
+
+              emoji = action === 'opened' ? '🐛' : '✅';
+              color = action === 'opened' ? '#fbca04' : '#28a745';
+              message = `Issue #${issue.number} ${action}: ${issue.title}`;
+
+            } else if (eventName === 'pull_request') {
+              const action = context.payload.action;
+              const pr = context.payload.pull_request;
+
+              emoji = action === 'opened' ? '🔀' : action === 'closed' && pr.merged ? '✅' : '❌';
+              color = action === 'opened' ? '#0366d6' : pr.merged ? '#6f42c1' : '#d73a49';
+              message = `PR #${pr.number} ${action}: ${pr.title}`;
+
+            } else if (eventName === 'release') {
+              emoji = '🚀';
+              color = '#28a745';
+              message = `Release ${context.payload.release.tag_name} published`;
+            }
+
+            core.setOutput('message', message);
+            core.setOutput('color', color);
+            core.setOutput('emoji', emoji);
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "${{ steps.context.outputs.emoji }} ${{ steps.context.outputs.message }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ steps.context.outputs.emoji }} ${{ steps.context.outputs.message }}\n\n<${{ github.event.repository.html_url }}|View Repository>"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repo:* ${{ github.repository }} | *Actor:* ${{ github.actor }}"
+                    }
+                  ]
+                }
+              ]
+            }
+
+  # ─── Discord Notifications ─────────────────────────────────────────────────────
+  discord:
+    name: 💬 Discord Notification
+    runs-on: ubuntu-latest
+    if: vars.DISCORD_WEBHOOK_URL != ''
+    steps:
+      - name: Determine notification context
+        id: context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const eventName = context.eventName;
+            let title = '';
+            let description = '';
+            let color = 3447003; // Blue
+
+            if (eventName === 'workflow_run') {
+              const workflow = context.payload.workflow_run;
+              const status = workflow.conclusion;
+
+              color = status === 'success' ? 3066993 : 15158332; // Green or Red
+              title = `${status === 'success' ? '✅' : '❌'} Workflow: ${workflow.name}`;
+              description = `Status: **${status}**\nBranch: \`${workflow.head_branch}\``;
+
+            } else if (eventName === 'issues') {
+              const action = context.payload.action;
+              const issue = context.payload.issue;
+
+              color = action === 'opened' ? 16763904 : 3066993; // Orange or Green
+              title = `${action === 'opened' ? '🐛' : '✅'} Issue #${issue.number} ${action}`;
+              description = issue.title;
+
+            } else if (eventName === 'pull_request') {
+              const action = context.payload.action;
+              const pr = context.payload.pull_request;
+
+              color = pr.merged ? 6917529 : 3447003; // Purple or Blue
+              title = `${pr.merged ? '✅' : '🔀'} PR #${pr.number} ${action}`;
+              description = pr.title;
+
+            } else if (eventName === 'release') {
+              color = 3066993; // Green
+              title = `🚀 Release ${context.payload.release.tag_name}`;
+              description = context.payload.release.name || 'New release published';
+            }
+
+            core.setOutput('title', title);
+            core.setOutput('description', description);
+            core.setOutput('color', color.toString());
+
+      - name: Send Discord notification
+        uses: tsickert/discord-webhook@v6.0.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          embed-title: ${{ steps.context.outputs.title }}
+          embed-description: ${{ steps.context.outputs.description }}
+          embed-url: ${{ github.event.repository.html_url }}
+          embed-color: ${{ steps.context.outputs.color }}
+          embed-footer-text: "${{ github.repository }} by ${{ github.actor }}"
+          embed-timestamp: ${{ github.event.repository.updated_at }}
+
+  # ─── Email Notifications (Critical Events) ────────────────────────────────────
+  email-critical:
+    name: 📧 Critical Alert Email
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' &&
+       contains(github.event.workflow_run.name, 'Deploy')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' &&
+       contains(github.event.workflow_run.name, 'Security'))
+    steps:
+      - name: Send email alert
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT || 587 }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🚨 Critical Failure: ${{ github.event.workflow_run.name }}"
+          to: ${{ secrets.ALERT_EMAIL }}
+          from: "GitHub Actions <noreply@github.com>"
+          body: |
+            Critical workflow failure detected!
+
+            Workflow: ${{ github.event.workflow_run.name }}
+            Status: ${{ github.event.workflow_run.conclusion }}
+            Branch: ${{ github.event.workflow_run.head_branch }}
+            Repository: ${{ github.repository }}
+
+            View logs: ${{ github.event.workflow_run.html_url }}
+
+  # ─── Microsoft Teams Notifications ────────────────────────────────────────────
+  teams:
+    name: 👥 Teams Notification
+    runs-on: ubuntu-latest
+    if: vars.TEAMS_WEBHOOK_URL != ''
+    steps:
+      - name: Send Teams notification
+        uses: aliencube/microsoft-teams-actions@v0.8.0
+        with:
+          webhook_uri: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          title: "${{ github.event_name }} in ${{ github.repository }}"
+          summary: "Event: ${{ github.event_name }}"
+          text: "Actor: ${{ github.actor }}"
