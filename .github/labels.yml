@@ -1,0 +1,157 @@
+# Labels GitHub pour le projet Agile-Scrum
+# Ce fichier est utilisé par le workflow maintenance.yml pour synchroniser les labels
+
+# ─── Types d'issues ───────────────────────────────────────────────────────────
+- name: "epic"
+  color: "3E4B9E"
+  description: "Large initiative spanning multiple sprints"
+
+- name: "user-story"
+  color: "0E8A16"
+  description: "User story (Agile)"
+
+- name: "bug"
+  color: "D73A4A"
+  description: "Something isn't working"
+
+- name: "task"
+  color: "1D76DB"
+  description: "Technical task"
+
+- name: "enhancement"
+  color: "A2EEEF"
+  description: "New feature or request"
+
+# ─── Status ───────────────────────────────────────────────────────────────────
+- name: "backlog"
+  color: "EDEDED"
+  description: "Not yet started, in backlog"
+
+- name: "in-progress"
+  color: "FFA500"
+  description: "Currently being worked on"
+
+- name: "in-review"
+  color: "FBCA04"
+  description: "In review/testing"
+
+- name: "blocked"
+  color: "B60205"
+  description: "Blocked by external dependency"
+
+- name: "done"
+  color: "0E8A16"
+  description: "Completed"
+
+# ─── Priority ─────────────────────────────────────────────────────────────────
+- name: "priority-critical"
+  color: "B60205"
+  description: "Critical priority - hotfix needed"
+
+- name: "priority-high"
+  color: "D93F0B"
+  description: "High priority"
+
+- name: "priority-medium"
+  color: "FBCA04"
+  description: "Medium priority"
+
+- name: "priority-low"
+  color: "0E8A16"
+  description: "Low priority"
+
+# ─── Areas/Components ─────────────────────────────────────────────────────────
+- name: "frontend"
+  color: "61DAFB"
+  description: "Frontend related"
+
+- name: "backend"
+  color: "68A063"
+  description: "Backend related"
+
+- name: "api"
+  color: "FF6F00"
+  description: "API related"
+
+- name: "database"
+  color: "336791"
+  description: "Database related"
+
+- name: "infrastructure"
+  color: "5319E7"
+  description: "Infrastructure/DevOps"
+
+- name: "documentation"
+  color: "0075CA"
+  description: "Documentation improvements"
+
+- name: "testing"
+  color: "BFD4F2"
+  description: "Testing related"
+
+# ─── Automatisation ───────────────────────────────────────────────────────────
+- name: "dependencies"
+  color: "0366D6"
+  description: "Dependency updates"
+
+- name: "automerge"
+  color: "128A0C"
+  description: "Can be auto-merged"
+
+- name: "keep-open"
+  color: "006B75"
+  description: "Exempt from stale automation"
+
+- name: "stale"
+  color: "EEEEEE"
+  description: "Inactive and will be closed soon"
+
+- name: "github-actions"
+  color: "2088FF"
+  description: "GitHub Actions workflow related"
+
+- name: "security"
+  color: "D73A4A"
+  description: "Security vulnerability or fix"
+
+# ─── Development ──────────────────────────────────────────────────────────────
+- name: "refactor"
+  color: "D4C5F9"
+  description: "Code refactoring"
+
+- name: "performance"
+  color: "F9D0C4"
+  description: "Performance improvement"
+
+- name: "technical-debt"
+  color: "795548"
+  description: "Technical debt to address"
+
+- name: "chore"
+  color: "FEF2C0"
+  description: "Maintenance task"
+
+# ─── Special ──────────────────────────────────────────────────────────────────
+- name: "good-first-issue"
+  color: "7057FF"
+  description: "Good for newcomers"
+
+- name: "help-wanted"
+  color: "008672"
+  description: "Extra attention is needed"
+
+- name: "question"
+  color: "D876E3"
+  description: "Further information is requested"
+
+- name: "duplicate"
+  color: "CFD3D7"
+  description: "This issue or pull request already exists"
+
+- name: "wontfix"
+  color: "FFFFFF"
+  description: "This will not be worked on"
+
+- name: "invalid"
+  color: "E4E669"
+  description: "Invalid issue"
