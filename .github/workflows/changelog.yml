@@ -1,0 +1,134 @@
+name: 📝 Auto-Generate Changelog
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  # ─── Generate Changelog ────────────────────────────────────────────────────────
+  changelog:
+    name: 📝 Generate Changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: .github/cliff.toml
+          args: --verbose --tag-pattern 'v[0-9]*'
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Commit and push changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet CHANGELOG.md; then
+            echo "No changes to CHANGELOG.md"
+          else
+            git add CHANGELOG.md
+            git commit -m "docs: update CHANGELOG.md [skip ci]"
+            git push
+            echo "✅ CHANGELOG.md updated"
+          fi
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+          retention-days: 30
+
+  # ─── Generate Release Notes ────────────────────────────────────────────────────
+  release-notes:
+    name: 📋 Generate Release Notes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release = context.payload.release;
+
+            // Get commits since last release
+            const commits = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: release.target_commitish,
+              head: 'HEAD'
+            });
+
+            // Categorize commits
+            const features = [];
+            const fixes = [];
+            const chores = [];
+            const breaking = [];
+
+            for (const commit of commits.data.commits) {
+              const message = commit.commit.message.split('\n')[0];
+
+              if (message.includes('BREAKING CHANGE')) {
+                breaking.push(message);
+              } else if (message.startsWith('feat')) {
+                features.push(message);
+              } else if (message.startsWith('fix')) {
+                fixes.push(message);
+              } else if (message.startsWith('chore')) {
+                chores.push(message);
+              }
+            }
+
+            // Build release notes
+            let notes = `# ${release.tag_name}\n\n`;
+
+            if (breaking.length > 0) {
+              notes += `## ⚠️ BREAKING CHANGES\n\n`;
+              breaking.forEach(msg => notes += `- ${msg}\n`);
+              notes += '\n';
+            }
+
+            if (features.length > 0) {
+              notes += `## ✨ New Features\n\n`;
+              features.forEach(msg => notes += `- ${msg}\n`);
+              notes += '\n';
+            }
+
+            if (fixes.length > 0) {
+              notes += `## 🐛 Bug Fixes\n\n`;
+              fixes.forEach(msg => notes += `- ${msg}\n`);
+              notes += '\n';
+            }
+
+            if (chores.length > 0) {
+              notes += `## 🔧 Maintenance\n\n`;
+              chores.forEach(msg => notes += `- ${msg}\n`);
+            }
+
+            // Update release
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body: notes
+            });
+
+            console.log('✅ Release notes generated');
